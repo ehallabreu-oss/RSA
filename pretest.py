@@ -26,19 +26,37 @@ def sine_tone(
 
     return sine
 
-frequency_stims = log_scale(400, 410, 12)
+frequency_stims = log_scale(400, 800, 1)
 
+duration_stims = log_scale(0.5, 1, 1)
 
-freq_pairs = []
-for freq in frequency_stims[1:]:
-    freq_pairs.append([float(frequency_stims[0]), float(freq)])
-    freq_pairs.append([float(freq), float(frequency_stims[0])])
+def make_trials(stim_list):
+    stim_pairs = []
+    for stim in stim_list[1:]:
+        stim_pairs.append([float(stim_list[0]), float(stim)])
+        stim_pairs.append([float(stim), float(stim_list[0])])
 
-mapping = {i: freq_pairs[i] for i in range(len(freq_pairs))}
+    stim_mapping = {i: stim_pairs[i] for i in range(len(stim_pairs))}
+    
+    trial_indices = list(stim_mapping.keys()) # create a list of all indices
+    random.shuffle(trial_indices) # shuffle them randomly
 
-# Randomize order
-trial_indices = list(mapping.keys()) # create a list of all indices
-random.shuffle(trial_indices) # shuffle them randomly
+    return stim_mapping, trial_indices
+
+freq_mapping, freq_trial_indices = make_trials(frequency_stims)
+dur_mapping, dur_trial_indices = make_trials(duration_stims)
+
+blocks = {'frequency' : {'mapping': freq_mapping, 
+               'trial_indices': freq_trial_indices, 
+               'name': 'frequency', 
+               'instruction': 'Choose the HIGHEST tone'}, 
+          'duration' : {'mapping': dur_mapping, 
+               'trial_indices': dur_trial_indices, 
+               'name': 'duration', 
+               'instruction': 'Choose the LONGEST tone'}}
+
+block_indices = list(blocks.keys()) 
+random.shuffle(block_indices)
 
 # intialize variables
 choices = ["first", "second"]
@@ -51,104 +69,168 @@ results = []
 class Experiment:
     def __init__(self, root):
         self.root = root       
-        self.participant_id = participant_id
 
         # --- Start window ---
         self.start_label = tk.Label(root, text="Welcome to this experiment!", font=("Arial", 36))
         self.start_label.pack(pady=30)  
         self.instructions = tk.Label(root, text="You will hear 2 tones, one after the other.\n" \
         "Choose which from the 2 you think is highest.\n\n" \
-        "2 tones will immediately play after you press space! \n\n" \
-        "Press SPACE to begin", font=("Arial", 34))
+        "Press SPACE to continue", font=("Arial", 34))
         self.instructions.pack(pady=20)
 
-        self.root.bind("<space>", self.start_experiment) # bind space key
+        self.root.bind("<space>", self.handle_events) # bind space key
   
         self.current_trial = -1 #so first increment lands at 0
-        self.started = False  
+        self.current_block = 0 
+        self.waiting_for_block_start = True
+        self.in_block = False
 
-    def start_experiment(self, event=None):
-        if self.started: # if it started, space bar does nothing
-            return None
-        self.started = True
+    def handle_events(self, event=None):
 
-        # clears initial instructrions
-        self.start_label.destroy()
-        self.instructions.destroy()
-        self.root.unbind("<space>")
+        # Blocks
+        if self.waiting_for_block_start and not self.in_block:
+            
+            # clear screen if first block
+            if hasattr(self, 'start_label'):
+                self.start_label.destroy()
+                self.instructions.destroy()
 
-        # between trial labels
-        self.label = tk.Label(root, text="Which tone is the highest?", font=("Arial", 28))
-        self.label.pack(pady=20) #add to the window with vertical padding
-        self.message_label = tk.Label(root, text="", font=("Arial", 28))
-        self.message_label.pack(pady=30)
+            # Set up UI if first time  
+            if not hasattr(self, 'buttons'):
 
-        self.buttons = []
-        for word in choices:
-            button = tk.Button(root, text=word, font=("Arial", 24), width=12, height=2,
-                               command=lambda choice=word: self.record_answer(choice))
-            button.pack(pady=10)
-            self.buttons.append(button)
+                self.message_label = tk.Label(root, text="", font=("Arial", 28))
+                self.message_label.pack(pady=70)
 
-        self.next_trial()
+                self.buttons = []
+                for word in choices:
+                    button = tk.Button(root, text=word, font=("Arial", 24), width=12, height=2,
+                                    command=lambda choice=word: self.record_answer(choice))
+                    button.pack(pady=10)
+                    self.buttons.append(button)
+
+                # hide buttons
+                for button in self.buttons:
+                    button.pack_forget()
+
+            # Show task info
+            block_type = block_indices[self.current_block]
+            this_block = blocks[block_type]
+            self.this_block = this_block    # remember which block we are on
+
+            self.message_label.config(
+                text=f'{this_block['instruction']}\n\nPress SPACE to start'       
+            )
+
+            self.waiting_for_block_start = False
+            self.in_block = False
+            return
+        
+        # Start trials
+        if not self.waiting_for_block_start and not self.in_block:
+            self.message_label.config(text="")  # clear old messages
+
+            for button in self.buttons:
+                button.pack(pady=10)
+                button.config(state='normal')
+
+            self.in_block = True
+            self.current_trial = -1
+            self.next_trial() 
 
     def next_trial(self):
         self.message_label.config(text="") # clear message
         self.root.update_idletasks() # ensure clear message is drawn before playing
         for button in self.buttons:
             button.config(state="normal")
-        self.current_trial += 1 # move to next trial
-
-        # end experiment if no more trials
-        if self.current_trial >= len(trial_indices):
-            print("Experiment finished!")
-            self.end_experiment()
-            return None
-
+        
+        # update trial counter
+        self.current_trial += 1 
+        
         # play sound
-        idx = trial_indices[self.current_trial] # get index of current trial
-        freq_pair = mapping[idx]    # get corresponding frequency pair
-        tone1 = sine_tone(frequency=freq_pair[0])
-        tone2 = sine_tone(frequency=freq_pair[1])
+        stim_mapping = self.this_block['mapping']
+        trial_indices = self.this_block['trial_indices']
+        trial_idx = trial_indices[self.current_trial]
+        
+        first, second = stim_mapping[trial_idx]
+
+        if self.this_block['name'] == 'frequency':
+            tone1 = sine_tone(frequency=first)
+            tone2 = sine_tone(frequency=second)
+        else:
+            tone1 = sine_tone(duration=first)
+            tone2 = sine_tone(duration=second)
+
         sd.play(tone1) 
         sd.wait()
         sd.play(tone2)
         sd.wait()
+    
+        #remember which stim was played 
+        self.first = first
+        self.second = second
+        self.current_trial_idx = trial_idx
 
-        #remember which stim was played
-        self.current_idx = idx
+    def next_block(self):
+        self.current_block += 1
 
+        if self.current_block >= len(blocks):
+            print("Experiment finished!")
+            self.end_experiment()
+            return None
+
+        # hide buttons
+        for button in self.buttons:
+            button.pack_forget()
+
+        self.message_label.config(
+            text="You've finished a block! \n\n" \
+            "Now the stimuli will change. \n\n" \
+            f"{self.this_block['instruction']}\n\n" \
+            "Press SPACE to continue"
+        )
+    
+        self.waiting_for_block_start = True
+        self.in_block = False
+          
     def record_answer(self, choice): 
-        freq1, freq2 = freq_pairs[self.current_idx]
-        
-        if choice == "first":
-            response = freq1
-        else:
-            response = freq2
+        first = self.first
+        second = self.second
 
-        if freq1 > freq2:
-            highest = freq1
+        if choice == "first":
+            response = first
         else:
-            highest = freq2
+            response = second
+
+        if first > second:
+            highest = first
+        else:
+            highest = second
    
         results.append({
-            "index": self.current_idx,
-            "freq1": freq1,
-            "freq2": freq2,
+            "index": self.current_trial_idx,
+            "block": self.this_block['name'],
+            "first": first,
+            "second": second,
             "response": response,
             "correct_response": highest,
             "score": 1 if response == highest else 0   
         })
 
-        self.message_label.config(text="Next tone pair...")
+        self.message_label.config(text=self.this_block['instruction'])
         self.root.update_idletasks()
         for button in self.buttons:
             button.config(state="disabled")
-        self.root.after(700, self.next_trial)
+        
+        trial_indices = self.this_block['trial_indices']
+
+        if self.current_trial + 1 >= len(trial_indices):
+            self.next_block()
+        else:
+            self.root.after(500, self.next_trial)
         
     def end_experiment(self):
         df = pd.DataFrame(results)
-        file_name = f"{self.participant_id}_tone_discrimination_results.csv"
+        file_name = f"tone_discrimination_results.csv"
         df.to_csv(file_name, index=False)
         print(df)
         self.root.quit() #close window
@@ -160,7 +242,6 @@ class Experiment:
 root = tk.Tk() # create main window
 root.geometry("900x800")
 root.withdraw()
-participant_id = simpledialog.askstring("Participant ID", "Enter your participant ID:")
 root.deiconify()
 Experiment(root) # create experiment object inside main window
 root.mainloop() # start the GUI event loop
