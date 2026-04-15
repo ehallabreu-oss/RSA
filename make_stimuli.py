@@ -52,21 +52,22 @@ def make_trials(stim_list):
 
 
 stimuli = {'frequency'   : [log_scale(400, 800, 1),
-                            'Choose the HIGHEST tone'], 
+                            'You will hear two tones', 'Choose the HIGHEST tone'], 
            'duration'    : [log_scale(0.5, 1, 1),
-                            'Choose the LONGEST tone'], 
+                            'You will hear two tones', 'Choose the LONGEST tone'], 
            'vertical_pos': [log_scale(30, 60, 1),
-                            'Choose the HIGHEST rectangle'],
+                            'You will see two rectangles', 'Choose the HIGHEST rectangle'],
            'length'      : [log_scale(80, 160, 1),
-                            'Choose the LONGEST rectangle']}
+                            'You will see two rectangles', 'Choose the LONGEST rectangle']}
 
 blocks = {}
 for stimulus in stimuli:
     mapping, trial_indices = make_trials(stimuli[stimulus][0])
-    message = stimuli[stimulus][1]
+    
     blocks[stimulus] = {'mapping': mapping, 
                         'trial_indices': trial_indices,
-                        'instruction': message,
+                        'block_instruction': f'{stimuli[stimulus][1]}\n\n{stimuli[stimulus][2]}',
+                        'trial_instruction': stimuli[stimulus][2],
                         'name': stimulus}
     
-print(stimuli['frequency'])
+
