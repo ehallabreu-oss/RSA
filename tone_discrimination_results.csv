@@ -1,0 +1,9 @@
+index,block,first,second,response,correct_response,score
+0,vertical_pos,30.0,60.0,60.0,60.0,1
+1,vertical_pos,60.0,30.0,60.0,60.0,1
+1,length,160.0,80.0,160.0,160.0,1
+0,length,80.0,160.0,160.0,160.0,1
+1,frequency,800.0,400.0,800.0,800.0,1
+0,frequency,400.0,800.0,800.0,800.0,1
+0,duration,0.5,1.0,1.0,1.0,1
+1,duration,1.0,0.5,1.0,1.0,1
