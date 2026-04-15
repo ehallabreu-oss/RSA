@@ -1,62 +1,31 @@
 import pandas as pd
-import numpy as np
+from make_stimuli import blocks, sine_tone
 import random
 import sounddevice as sd
 import tkinter as tk
 from tkinter import simpledialog
 
-# making the tones
-def log_scale(min, max, num_steps):
-    stimuli = np.empty(num_steps+1)
-    for n in range(num_steps+1):
-        stimuli[n] = min*(max/min)**(n/num_steps)
-    return stimuli
-
-def sine_tone(
-        frequency: int=400,
-        duration: float=0.5,
-        amplitude: float=0.5,
-        sample_rate: int=44100
-        ) -> np.ndarray:
-    
-    n_samples = int(duration * sample_rate)
-    
-    time_points = np.linspace(0, duration, n_samples, False)
-    sine = np.sin(2*np.pi*frequency*time_points) * amplitude
-
-    return sine
-
-frequency_stims = log_scale(400, 800, 1)
-
-duration_stims = log_scale(0.5, 1, 1)
-
-def make_trials(stim_list):
-    stim_pairs = []
-    for stim in stim_list[1:]:
-        stim_pairs.append([float(stim_list[0]), float(stim)])
-        stim_pairs.append([float(stim), float(stim_list[0])])
-
-    stim_mapping = {i: stim_pairs[i] for i in range(len(stim_pairs))}
-    
-    trial_indices = list(stim_mapping.keys()) # create a list of all indices
-    random.shuffle(trial_indices) # shuffle them randomly
-
-    return stim_mapping, trial_indices
-
-freq_mapping, freq_trial_indices = make_trials(frequency_stims)
-dur_mapping, dur_trial_indices = make_trials(duration_stims)
-
-blocks = {'frequency' : {'mapping': freq_mapping, 
-               'trial_indices': freq_trial_indices, 
-               'name': 'frequency', 
-               'instruction': 'Choose the HIGHEST tone'}, 
-          'duration' : {'mapping': dur_mapping, 
-               'trial_indices': dur_trial_indices, 
-               'name': 'duration', 
-               'instruction': 'Choose the LONGEST tone'}}
-
 block_indices = list(blocks.keys()) 
 random.shuffle(block_indices)
+
+isi = 0.4 # inter stimulus interval
+canvas_width = 400.0
+canvas_height = 400.0
+
+def rectangle_coords(
+    height: float=30.0,
+    length: float=80.0,
+    vertical_pos: float=20.0,
+    horizontal_pos: float=10.0,
+    canvas_height: float=canvas_height
+    ):
+
+    x1 = horizontal_pos
+    x2 = x1 + length
+    y1 = canvas_height - vertical_pos 
+    y2 = y1 - height
+
+    return x1, y1, x2, y2
 
 # intialize variables
 choices = ["first", "second"]
@@ -70,23 +39,31 @@ class Experiment:
     def __init__(self, root):
         self.root = root       
 
-        # --- Start window ---
+        # Start window 
         self.start_label = tk.Label(root, text="Welcome to this experiment!", font=("Arial", 36))
-        self.start_label.pack(pady=30)  
-        self.instructions = tk.Label(root, text="You will hear 2 tones, one after the other.\n" \
-        "Choose which from the 2 you think is highest.\n\n" \
-        "Press SPACE to continue", font=("Arial", 34))
-        self.instructions.pack(pady=20)
+        self.start_label.pack(pady=120)  
+        self.instructions = tk.Label(root, text="You will either hear 2 tones OR see 2 rectangles\n" 
+                                     "presented one after the other.\n\n\n" 
+                                     "Press SPACE to continue", font=("Arial", 34))
+        self.instructions.pack(pady=0)
+        
+        # make canvas to draw rectangle later
+        self.canvas = tk.Canvas(self.root, width=canvas_width, height=canvas_height, bg='white')
+        self.draw_canvas(False)
 
-        self.root.bind("<space>", self.handle_events) # bind space key
-  
+        self.root.bind("<space>", self.handle_events) 
         self.current_trial = -1 #so first increment lands at 0
         self.current_block = 0 
         self.waiting_for_block_start = True
         self.in_block = False
+    
+    def draw_canvas(self, visible): 
+        if visible:
+            self.canvas.pack(pady=200)
+        else:
+            self.canvas.pack_forget()
 
     def handle_events(self, event=None):
-
         # Blocks
         if self.waiting_for_block_start and not self.in_block:
             
@@ -98,14 +75,14 @@ class Experiment:
             # Set up UI if first time  
             if not hasattr(self, 'buttons'):
 
-                self.message_label = tk.Label(root, text="", font=("Arial", 28))
-                self.message_label.pack(pady=70)
+                self.message_label = tk.Label(root, text="", font=("Arial", 34))
+                self.message_label.pack(pady=200)
 
                 self.buttons = []
                 for word in choices:
                     button = tk.Button(root, text=word, font=("Arial", 24), width=12, height=2,
                                     command=lambda choice=word: self.record_answer(choice))
-                    button.pack(pady=10)
+                    button.pack(pady=200)
                     self.buttons.append(button)
 
                 # hide buttons
@@ -115,20 +92,21 @@ class Experiment:
             # Show task info
             block_type = block_indices[self.current_block]
             this_block = blocks[block_type]
-            self.this_block = this_block    # remember which block we are on
 
             self.message_label.config(
                 text=f'{this_block['instruction']}\n\nPress SPACE to start'       
             )
 
+            self.this_block = this_block    # remember which block we are on
             self.waiting_for_block_start = False
             self.in_block = False
             return
         
+        
         # Start trials
         if not self.waiting_for_block_start and not self.in_block:
             self.message_label.config(text="")  # clear old messages
-
+                
             for button in self.buttons:
                 button.pack(pady=10)
                 button.config(state='normal')
@@ -137,9 +115,42 @@ class Experiment:
             self.current_trial = -1
             self.next_trial() 
 
+    def flash_rectangles(self, first, second, block_name, delay, pause=int(1000*isi)):
+        self.draw_canvas(True)
+        
+        for button in self.buttons:
+            button.pack_forget()
+        
+        if block_name == 'vertical_pos':
+            coords1 = rectangle_coords(vertical_pos=first)
+            coords2 = rectangle_coords(vertical_pos=second)
+        else:
+            coords1 = rectangle_coords(length=first)
+            coords2 = rectangle_coords(length=second)
+
+        self.rect1 = self.canvas.create_rectangle(*coords1, fill='black')
+
+        def delete_first():
+            self.canvas.delete(self.rect1)
+
+        def show_second():
+            self.rect2 = self.canvas.create_rectangle(*coords2, fill='black')
+        
+        def end_sequence():
+            self.canvas.delete(self.rect2)
+            for button in self.buttons:
+                button.config(state="normal")
+            self.draw_canvas(False)    
+
+        self.root.after(delay, delete_first)
+        self.root.after(delay+pause, show_second)
+        self.root.after(pause+delay*2, end_sequence)
+        
+
     def next_trial(self):
         self.message_label.config(text="") # clear message
         self.root.update_idletasks() # ensure clear message is drawn before playing
+
         for button in self.buttons:
             button.config(state="normal")
         
@@ -153,18 +164,27 @@ class Experiment:
         
         first, second = stim_mapping[trial_idx]
 
-        if self.this_block['name'] == 'frequency':
-            tone1 = sine_tone(frequency=first)
-            tone2 = sine_tone(frequency=second)
+        if self.this_block['name'] == 'frequency' or self.this_block['name'] == 'duration':
+            if self.this_block['name'] == 'frequency':
+                tone1 = sine_tone(frequency=first)
+                tone2 = sine_tone(frequency=second)
+            else:
+                tone1 = sine_tone(duration=first)
+                tone2 = sine_tone(duration=second)
+            
+            silence = sine_tone(amplitude=0, duration=isi)
+            
+            sd.play(tone1)
+            sd.wait()
+            sd.play(silence)
+            sd.wait()
+            sd.play(tone2)
+            sd.wait()   
+        
         else:
-            tone1 = sine_tone(duration=first)
-            tone2 = sine_tone(duration=second)
-
-        sd.play(tone1) 
-        sd.wait()
-        sd.play(tone2)
-        sd.wait()
-    
+            self.flash_rectangles(first, second, self.this_block['name'], 1000)
+            self.root.update_idletasks()
+                        
         #remember which stim was played 
         self.first = first
         self.second = second
@@ -178,14 +198,14 @@ class Experiment:
             self.end_experiment()
             return None
 
-        # hide buttons
+        # hide buttons and canvas
         for button in self.buttons:
             button.pack_forget()
+        self.draw_canvas(False)
 
         self.message_label.config(
             text="You've finished a block! \n\n" \
             "Now the stimuli will change. \n\n" \
-            f"{self.this_block['instruction']}\n\n" \
             "Press SPACE to continue"
         )
     
@@ -226,7 +246,7 @@ class Experiment:
         if self.current_trial + 1 >= len(trial_indices):
             self.next_block()
         else:
-            self.root.after(500, self.next_trial)
+            self.root.after(400, self.next_trial)
         
     def end_experiment(self):
         df = pd.DataFrame(results)
