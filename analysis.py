@@ -19,16 +19,23 @@ for row in rows[1:]:
     for n in range(len(column_names)):
         columns[column_names[n]].append(row[n])
 
-frequencies = stimuli['frequency'][0]
+scores = {}
+for stimulus_type in stimuli:
+    scores[stimulus_type] = {}
+    values = stimuli[stimulus_type][0]
+    for value in values[1:]:
+        scores[stimulus_type][float(value)] = []
 
-scores = {float(frequency): [] for frequency in frequencies[1:]}
 for n in range(len(rows)-1):
-    frequency = columns['correct_response'][n]
-    scores[float(frequency)].append(int(columns['score'][n]))
+    stimulus_type = columns['block'][n]
+    value = columns['correct_response'][n]
+    scores[stimulus_type][float(value)].append(int(columns['score'][n]))
 
 accuracy = {}
-for frequency in scores:
-    mean = sum(scores[frequency]) / len(scores[frequency])
-    accuracy[frequency] = mean
+for simulus_type in scores:
+    accuracy[stimulus_type] = {}
+    for value in scores[stimulus_type]:
+        mean = sum(scores[stimulus_type][value]) / len(scores[stimulus_type][value])
+        accuracy[stimulus_type][value] = mean
 
 print(accuracy)
