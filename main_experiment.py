@@ -1,5 +1,5 @@
 import pandas as pd
-from make_stimuli import blocks, sine_tone, rectangle_coords
+from make_stimuli import blocks, sine_tone
 import random
 import sounddevice as sd
 import tkinter as tk
@@ -11,6 +11,21 @@ random.shuffle(block_indices)
 isi = 0.5 # inter stimulus interval
 canvas_width = 400.0
 canvas_height = 400.0
+
+def rectangle_coords(
+    height: float=30.0,
+    length: float=80.0,
+    vertical_pos: float=20.0,
+    horizontal_pos: float=10.0,
+    canvas_height: float=canvas_height
+    ):
+
+    x1 = horizontal_pos
+    x2 = x1 + length
+    y1 = canvas_height - vertical_pos 
+    y2 = y1 - height
+
+    return x1, y1, x2, y2
 
 # intialize variables
 choices = ["first", "second"]

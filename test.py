@@ -3,10 +3,10 @@ import tkinter as tk
 import random
 
 def rectangle_coords(
-    height: float=30.0,
-    length: float=80.0,
-    vertical_pos: float=20.0,
-    horizontal_pos: float=10.0
+    height: int=30,
+    length: int=80,
+    vertical_pos: int=20,
+    horizontal_pos: int=10
     ):
 
     x1 = horizontal_pos
@@ -17,7 +17,6 @@ def rectangle_coords(
     return x1, y1, x2, y2
 
 print(*rectangle_coords())
-
 
 class Rectangle_test:
     def __init__(self, root):

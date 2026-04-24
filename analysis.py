@@ -1,7 +1,7 @@
 import csv
 from make_stimuli import stimuli
 
-with open('kevin1_tone_discrimination_results.csv', newline='') as csvfile:
+with open('kevin_full_discrimination_results.csv', newline='') as csvfile:
     kevin = csv.reader(csvfile, delimiter=',')
     rows = []
     for row in kevin:
@@ -32,10 +32,11 @@ for n in range(len(rows)-1):
     scores[stimulus_type][float(value)].append(int(columns['score'][n]))
 
 accuracy = {}
-for simulus_type in scores:
-    accuracy[stimulus_type] = {}
-    for value in scores[stimulus_type]:
-        mean = sum(scores[stimulus_type][value]) / len(scores[stimulus_type][value])
-        accuracy[stimulus_type][value] = mean
 
-print(accuracy)
+for stimulus_key in scores:
+    accuracy[stimulus_key] = {}
+    for value in scores[stimulus_key]:
+        mean = sum(scores[stimulus_key][value]) / len(scores[stimulus_key][value])
+        accuracy[stimulus_key][value] = mean
+
+print(accuracy)   
